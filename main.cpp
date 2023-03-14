@@ -1,4 +1,5 @@
 #include <iostream>
+#include <thread>
 #include "ThreadedMatrixMult.h"
 using namespace std;
 
@@ -7,6 +8,7 @@ ostream& printMatrix(const SquareMatrix&, ostream&);
 SquareMatrix& readMatrix(istream&);
 
 int main() {
+
 
     //read in matrices
     SquareMatrix m1 = readMatrix(cin);
@@ -43,9 +45,8 @@ ostream& printMatrix(const SquareMatrix& m, ostream& out) {
 }
 
 SquareMatrix& readMatrix(istream& in) {
-    SquareMatrix m{};
 
-    in >> m.dim;
+    SquareMatrix m(cin.get());
     m.data = new int*[m.dim];
     for(int i = 0; i < m.dim; i++) {
         m.data[i] = new int[m.dim];

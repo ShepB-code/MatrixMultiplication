@@ -5,57 +5,69 @@
 #ifndef MATRIXMULTIPLICATION_THREADEDMATRIXMULT_H
 #define MATRIXMULTIPLICATION_THREADEDMATRIXMULT_H
 
+#include <pthread.h>
 #include <thread>
+#include <vector>
 using namespace std;
 
 
 struct SquareMatrix{
     int dim;
-
     int** data;    // points to a [dim x dim] square matrix
+    SquareMatrix(int dim) {
+        this->dim = dim;
+        data = new int*[dim];
+        for(int i = 0; i < dim; i++) {
+            data[i] = new int[dim];
+            for(int j = 0; j < dim; j++) {
+                data[i][j] = 0;
+            }
+        }
+    }
 };
 
-struct Package {
-    SquareMatrix matrix1;
-    SquareMatrix matrix2;
+struct MatrixThreadParams {
+    SquareMatrix* A;
+    SquareMatrix* B;
+    SquareMatrix* R;
+    int rowOffset, columnOffset, dim;
 };
 
 void * BruteForceSquareMatrixMultiplication(void *package) {
-    Package* matrixPackage = (Package*)package;
+    MatrixThreadParams* matrixPackage = (MatrixThreadParams*)package;
 
-    SquareMatrix* resM = new SquareMatrix{matrixPackage->matrix1.dim, new int*[matrixPackage->matrix1.dim]};
+    //SquareMatrix* resM = new SquareMatrix{matrixPackage->A->dim, new int*[matrixPackage->A->dim]};
 
-    for(int i = 0; i < resM->dim; i++) {
-        resM->data[i] = new int[resM->dim];
-        for(int j = 0; j < resM->dim; j++) {
-            resM->data[i][j] = 0;
-            for(int k = 0; k < resM->dim; k++) {
-                resM->data[i][j] += matrixPackage->matrix1.data[i][k] * matrixPackage->matrix2.data[k][j];
+    for(int i = 0; i < matrixPackage->rowOffset; i++) {
+        for(int j = 0; j < matrixPackage->columnOffset; j++) {
+            matrixPackage->R->data[i][j] = 0;
+            for(int k = 0; k < m->dim; k++) {
+                resM->data[i][j] += matrixPackage->A->data[i][k] * matrixPackage->B->data[k][j];
             }
         }
     }
     return (void *)resM;
 }
 SquareMatrix* BruteForce(const SquareMatrix& A, const SquareMatrix& B) {
-    SquareMatrix* m = new SquareMatrix;
-    m->dim = A.dim;
-    m->data = new int*[m->dim];
-
+    SquareMatrix* m = new SquareMatrix(A.dim);
+    int sum;
     for(int i = 0; i < m->dim; i++) {
         m->data[i] = new int[m->dim];
         for(int j = 0; j < m->dim; j++) {
             m->data[i][j] = 0;
+            sum = 0;
             for(int k = 0; k < m->dim; k++) {
-                m->data[i][j] += A.data[i][k] * B.data[k][j];
+                sum += A.data[i][k] * B.data[k][j];
             }
+            m->data[i][j] = sum;
         }
     }
     return m;
 }
 SquareMatrix* ThreadedDivideAndConquer(const SquareMatrix& A, const SquareMatrix& B) {
 
-    SquareMatrix* resM = new SquareMatrix;
-    resM->dim = A.dim;
+    SquareMatrix* resM = new SquareMatrix(A.dim);
+
     if(A.dim == 1 && B.dim == 1) {
         resM->data[0][0] = A.data[0][0] * B.data[0][0];
     } else {
@@ -96,17 +108,26 @@ SquareMatrix* ThreadedDivideAndConquer(const SquareMatrix& A, const SquareMatrix
             }
         }
 
-        // spawn 4 threads
-        SquareMatrix* res;
-        thread thread1(res = (SquareMatrix*) BruteForceSquareMatrixMultiplication, new Package{A11, B11});
-        thread1.join();
+        // spawn threads
+        vector<thread> threads;
 
+        // spawn 4 threads
+        threads.emplace_back([&C11 = resM, &A11, &B11]() {C11 = ThreadedDivideAndConquer(A11, B11);});
+        threads.emplace_back([&C12 = resM, &A12, &B12]() {C12 = ThreadedDivideAndConquer(A12, B12);});
+        threads.emplace_back([&C21 = resM, &A21, &B21]() {C21 = ThreadedDivideAndConquer(A21, B21);});
+        threads.emplace_back([&C22 = resM, &A22, &B22]() {C22 = ThreadedDivideAndConquer(A22, B22);});
+
+        for(auto& t: threads) {
+            t.join();
+        }
     }
     return resM;
 
 }
 SquareMatrix* Strassen(const SquareMatrix& A, const SquareMatrix& B);
-SquareMatrix* ThreadedStrassen(const SquareMatrix& A, const SquareMatrix& B);
+SquareMatrix* ThreadedStrassen(const SquareMatrix& A, const SquareMatrix& B) {
+
+}
 
 
 
