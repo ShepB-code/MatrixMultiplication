@@ -26,9 +26,16 @@ struct SquareMatrix{
 };
 
 struct MatrixSection {
+    SquareMatrix* M;
     int rowStart, rowEnd;
     int colStart, colEnd;
-    MatrixSection(int rowStart, int rowEnd, int colStart, int colEnd) : rowStart(rowStart), rowEnd(rowEnd), colStart(colStart), colEnd(colEnd) {}
+    MatrixSection(SquareMatrix* M, int rowStart, int rowEnd, int colStart, int colEnd) {
+        this->M = M;
+        this->rowStart = rowStart;
+        this->rowEnd = rowEnd;
+        this->colStart = colStart;
+        this->colEnd = colEnd;
+    }
 };
 struct MatrixThreadParams {
     const SquareMatrix* A;
@@ -160,13 +167,13 @@ SquareMatrix* Strassen(const SquareMatrix& A, const SquareMatrix& B) {
             B22->data[i][j] = B.data[i + mid][j + mid];
         }
     }
-    SquareMatrix* s1 = BruteForce(*A11, *matrixSubtraction(*B12, *B22)); // A(F-H)
-    SquareMatrix* s2 = BruteForce(*matrixAddition(*A11, *A12), *B22); // (A+B)F
-    SquareMatrix* s3 = BruteForce(*matrixAddition(*A21, *A22), *B11); // (C+D)E
-    SquareMatrix* s4 = BruteForce(*A22, *matrixSubtraction(*B21, *B11)); // D(G-E)
-    SquareMatrix* s5 = BruteForce(*matrixAddition(*A11, *A22), *matrixAddition(*B11, *B22)); // (A+D)(E+H)
-    SquareMatrix* s6 = BruteForce(*matrixSubtraction(*A12, *A22), *matrixAddition(*B21, *B22)); // (B-D)(G+H)
-    SquareMatrix* s7 = BruteForce(*matrixSubtraction(*A11, *A21), *matrixAddition(*B11, *B12)); // (A-C)(E+F)
+    SquareMatrix* s1 = ThreadedDivideAndConquer(*A11, *matrixSubtraction(*B12, *B22)); // A(F-H)
+    SquareMatrix* s2 = ThreadedDivideAndConquer(*matrixAddition(*A11, *A12), *B22); // (A+B)F
+    SquareMatrix* s3 = ThreadedDivideAndConquer(*matrixAddition(*A21, *A22), *B11); // (C+D)E
+    SquareMatrix* s4 = ThreadedDivideAndConquer(*A22, *matrixSubtraction(*B21, *B11)); // D(G-E)
+    SquareMatrix* s5 = ThreadedDivideAndConquer(*matrixAddition(*A11, *A22), *matrixAddition(*B11, *B22)); // (A+D)(E+H)
+    SquareMatrix* s6 = ThreadedDivideAndConquer(*matrixSubtraction(*A12, *A22), *matrixAddition(*B21, *B22)); // (B-D)(G+H)
+    SquareMatrix* s7 = ThreadedDivideAndConquer(*matrixSubtraction(*A11, *A21), *matrixAddition(*B11, *B12)); // (A-C)(E+F)
 
     SquareMatrix* I = matrixAddition(*s5, *matrixAddition(*s6, *matrixSubtraction(*s4, *s2))); // (s5+(s6+(s4-s2)))
     SquareMatrix* J = matrixAddition(*s1, *s2); // (s1 + s2)

@@ -5,7 +5,7 @@
 #include "ThreadedMatrixMult.h"
 using namespace std;
 
-const int DIMENSION = 512;
+const int DIMENSION = 2048;
 
 ostream& printMatrix(const SquareMatrix&, ostream&);
 SquareMatrix* readMatrix(istream&);
