@@ -45,17 +45,19 @@ struct MatrixThreadParams {
     const MatrixSection* A;
     const MatrixSection* B;
     MatrixSection* R;
-    MatrixThreadParams(const MatrixSection* A, const MatrixSection* B, MatrixSection* R) {
+    bool all;
+    MatrixThreadParams(const MatrixSection* A, const MatrixSection* B, MatrixSection* R, bool all) {
         this->A = A;
         this->B = B;
         this->R = R;
+        this->all = all;
     }
     //MatrixThreadParams(const SquareMatrix *a, const SquareMatrix *b, SquareMatrix *r, int rowEnd, int colEnd, int dim, int rowStart, int colStart) : A(a), B(b), R(r), rowEnd(rowEnd), colEnd(colEnd), dim(dim), rowStart(rowStart), colStart(colStart) {}
 };
 
 MatrixSection* matrixAddition(const MatrixSection& A, const MatrixSection& B, MatrixSection& C) {
     //SquareMatrix* C = new SquareMatrix(A.dim);
-    cout << A.dim << "x" << B.dim << "->" << C.dim << endl;
+    //cout << A.dim << "x" << B.dim << "->" << C.dim << endl;
 
     for(int i = 0; i < C.dim; i++) {
         for(int j = 0; j < C.dim; j++) {
@@ -66,7 +68,7 @@ MatrixSection* matrixAddition(const MatrixSection& A, const MatrixSection& B, Ma
 }
 
 MatrixSection* matrixSubtraction(const MatrixSection& A, const MatrixSection& B, MatrixSection& C) {
-    cout << A.dim << "x" << B.dim << "->" << C.dim << endl;
+    //cout << A.dim << "x" << B.dim << "->" << C.dim << endl;
     for(int i = 0; i < C.dim; i++) {
         for(int j = 0; j < C.dim; j++) {
             C.M->data[i + C.rowStart][j + C.colStart] = A.M->data[i + A.rowStart][j + A.colStart] - B.M->data[i + B.rowStart][j + B.colStart];
@@ -84,22 +86,33 @@ void* BruteForceSquareMatrixMultiplication(void* params) {
     const MatrixSection* B = matrixParams->B;
     MatrixSection* R = matrixParams->R;
 
-    cout << "A (" << A->rowStart << "," << A->colStart << ") " << " B ("<< B->rowStart << "," << B->colStart << ") " << "R (" << R->rowStart << "," << R->colStart << ")" << endl;
+    //cout << "A (" << A->rowStart << "," << A->colStart << ") " << " B ("<< B->rowStart << "," << B->colStart << ") " << "R (" << R->rowStart << "," << R->colStart << ")" << endl;
 
 
-                                            //cout << A->M->dim << "x" << B->M->dim << "->" << R->dim << endl;
-    int mid = R->dim/2;
+    int mid = R->M->dim/2;
     for(int i = 0; i < mid; i++) {
         for(int j = 0; j < mid; j++) {
             //matrixParams->R->data[i][j] = 0;
             int sum = 0;
-            for(int k = 0; k < mid; k++) {
-                sum += A->M->data[i + A->rowStart][k + A->colStart] * B->M->data[k + B->rowStart][j + B->colStart];
+
+            int kBound = matrixParams->all ? R->M->dim : min(A->M->dim, B->M->dim);
+            for(int k = 0; k < kBound; k++) {
+                if(matrixParams->all) {
+                    sum += A->M->data[i][k] * B->M->data[k][j];
+                } else {
+                    if (A->M->dim > B->M->dim) {
+                        sum += A->M->data[i + A->rowStart][k + A->colStart] * B->M->data[k][j];
+                    } else if (B->M->dim > A->M->dim) {
+                        sum += A->M->data[i][k] * B->M->data[k + B->rowStart][j + B->colStart];
+                    } else {
+                        sum += A->M->data[i][k] * B->M->data[k][j];
+                    }
+                }
             }
             R->M->data[i + R->rowStart][j + R->colStart] = sum;
         }
     }
-    cout << "Done" << endl;
+    //cout << "Done" << endl;
     //pthread_exit(NULL);
     //return params;
 }
@@ -112,14 +125,20 @@ void StrassenHelper(const MatrixSection& A, const MatrixSection& B, MatrixSectio
     } else {
         int mid = A.dim/2;
         // split matrix into 4 sections
-        MatrixThreadParams* R11Param = new MatrixThreadParams(new MatrixSection(A.M, A.rowStart, A.colStart, mid), new MatrixSection(B.M, B.rowStart, B.colStart, mid), new MatrixSection(C.M, C.rowStart, C.colStart, mid));
-        MatrixThreadParams* R12Param = new MatrixThreadParams(new MatrixSection(A.M, A.rowStart, A.colStart + mid, mid), new MatrixSection(B.M, B.rowStart, B.colStart + mid, mid), new MatrixSection(C.M, C.rowStart, C.colStart + mid, mid));
-        MatrixThreadParams* R21Param = new MatrixThreadParams(new MatrixSection(A.M,  A.rowStart + mid, A.colStart, mid), new MatrixSection(B.M, B.rowStart + mid, B.colStart, mid), new MatrixSection(C.M, C.rowStart + mid, C.colStart, mid));
-        MatrixThreadParams* R22Param = new MatrixThreadParams(new MatrixSection(A.M, A.rowStart + mid, A.colStart + mid, mid), new MatrixSection(B.M, B.rowStart + mid, B.colStart + mid, mid), new MatrixSection(C.M, C.rowStart + mid, C.colStart + mid, mid));
+        /*
+        MatrixThreadParams* R11Param = new MatrixThreadParams(new MatrixSection(A.M, A.rowStart, A.colStart, mid), new MatrixSection(B.M, B.rowStart, B.colStart, mid), new MatrixSection(C.M, C.rowStart, C.colStart, mid), false);
+        MatrixThreadParams* R12Param = new MatrixThreadParams(new MatrixSection(A.M, A.rowStart, A.colStart + mid, mid), new MatrixSection(B.M, B.rowStart, B.colStart + mid, mid), new MatrixSection(C.M, C.rowStart, C.colStart + mid, mid), false);
+        MatrixThreadParams* R21Param = new MatrixThreadParams(new MatrixSection(A.M,  A.rowStart + mid, A.colStart, mid), new MatrixSection(B.M, B.rowStart + mid, B.colStart, mid), new MatrixSection(C.M, C.rowStart + mid, C.colStart, mid), false);
+        MatrixThreadParams* R22Param = new MatrixThreadParams(new MatrixSection(A.M, A.rowStart + mid, A.colStart + mid, mid), new MatrixSection(B.M, B.rowStart + mid, B.colStart + mid, mid), new MatrixSection(C.M, C.rowStart + mid, C.colStart + mid, mid), false);
+
+        */
+        MatrixThreadParams* R11Param = new MatrixThreadParams(new MatrixSection(A.M, 0, 0, mid), new MatrixSection(B.M, 0, 0, mid), new MatrixSection(C.M, C.rowStart, C.colStart, mid), false);
+        MatrixThreadParams* R12Param = new MatrixThreadParams(new MatrixSection(A.M, 0,  mid, mid), new MatrixSection(B.M, 0, mid, mid), new MatrixSection(C.M, C.rowStart, C.colStart + mid, mid), false);
+        MatrixThreadParams* R21Param = new MatrixThreadParams(new MatrixSection(A.M,  mid, 0, mid), new MatrixSection(B.M,  mid, 0, mid), new MatrixSection(C.M, C.rowStart + mid, C.colStart, mid), false);
+        MatrixThreadParams* R22Param = new MatrixThreadParams(new MatrixSection(A.M, mid, mid, mid), new MatrixSection(B.M, mid, mid, mid), new MatrixSection(C.M, C.rowStart + mid, C.colStart + mid, mid), false);
 
         pthread_t id1, id2, id3, id4;
         // spawn 4 threads
-
 
 
         BruteForceSquareMatrixMultiplication((void*)R11Param);
@@ -168,26 +187,35 @@ SquareMatrix* ThreadedDivideAndConquer(const SquareMatrix& A, const SquareMatrix
     } else {
         int mid = A.dim / 2;
 
-        MatrixThreadParams* R11Param = new MatrixThreadParams(new MatrixSection((SquareMatrix *) &A, 0, 0, mid), new MatrixSection((SquareMatrix *)&B, 0, 0, mid), new MatrixSection((SquareMatrix *) &resM, 0, 0, mid));
-        MatrixThreadParams* R12Param = new MatrixThreadParams(new MatrixSection((SquareMatrix *) &A, 0, mid, mid), new MatrixSection((SquareMatrix*) &B, 0, mid,mid), new MatrixSection((SquareMatrix *) &resM, 0, mid, mid));
-        MatrixThreadParams* R21Param = new MatrixThreadParams(new MatrixSection((SquareMatrix *) &A, mid, 0, mid), new MatrixSection((SquareMatrix*) &B, mid, 0, mid), new MatrixSection((SquareMatrix *) &resM, mid, 0, mid));
-        MatrixThreadParams* R22Param = new MatrixThreadParams(new MatrixSection((SquareMatrix *) &A, mid, mid, mid), new MatrixSection((SquareMatrix *)&B, mid, mid, mid), new MatrixSection((SquareMatrix *) &resM, mid, mid, mid));
+        MatrixThreadParams* R11Param = new MatrixThreadParams(new MatrixSection((SquareMatrix *) &A, 0, 0, mid), new MatrixSection((SquareMatrix *)&B, 0, 0, mid), new MatrixSection(resM, 0, 0, mid), true);
+        MatrixThreadParams* R12Param = new MatrixThreadParams(new MatrixSection((SquareMatrix *) &A, 0, mid, mid), new MatrixSection((SquareMatrix*) &B, 0, mid,mid), new MatrixSection(resM, 0, mid, mid), true);
+        MatrixThreadParams* R21Param = new MatrixThreadParams(new MatrixSection((SquareMatrix *) &A, mid, 0, mid), new MatrixSection((SquareMatrix*) &B, mid, 0, mid), new MatrixSection(resM, mid, 0, mid), true);
+        MatrixThreadParams* R22Param = new MatrixThreadParams(new MatrixSection((SquareMatrix *) &A, mid, mid, mid), new MatrixSection((SquareMatrix *)&B, mid, mid, mid), new MatrixSection(resM, mid, mid, mid),true);
 
         pthread_t id1, id2, id3, id4;
 
+
+        cout << "R11: A(" << R11Param->A->rowStart << "," << R11Param->A->colStart << ") B(" << R11Param->B->rowStart << "," << R11Param->B->colStart << ") R(" << R11Param->R->rowStart << "," << R11Param->R->colStart << ")" << endl;
+        cout << "R12: A(" << R12Param->A->rowStart << "," << R12Param->A->colStart << ") B(" << R12Param->B->rowStart << "," << R12Param->B->colStart << ") R(" << R12Param->R->rowStart << "," << R12Param->R->colStart << ")" << endl;
+        cout << "R21: A(" << R21Param->A->rowStart << "," << R21Param->A->colStart << ") B(" << R21Param->B->rowStart << "," << R21Param->B->colStart << ") R(" << R21Param->R->rowStart << "," << R21Param->R->colStart << ")" << endl;
+        cout << "R22: A(" << R22Param->A->rowStart << "," << R22Param->A->colStart << ") B(" << R22Param->B->rowStart << "," << R22Param->B->colStart << ") R(" << R22Param->R->rowStart << "," << R22Param->R->colStart << ")" << endl;
+
+        /*
+        BruteForceSquareMatrixMultiplication((void *)R11Param);
+        BruteForceSquareMatrixMultiplication((void *)R12Param);
+        BruteForceSquareMatrixMultiplication((void *)R21Param);
+        BruteForceSquareMatrixMultiplication((void *)R22Param);
+        */
+
         pthread_create(&id1, NULL, &BruteForceSquareMatrixMultiplication, (void *)R11Param);
-        pthread_join(id1, NULL);
-
         pthread_create( &id2, NULL, &BruteForceSquareMatrixMultiplication, (void *)R12Param);
-        pthread_join(id2, NULL);
-
         pthread_create(&id3, NULL, &BruteForceSquareMatrixMultiplication, (void *)R21Param);
-        pthread_join(id3, NULL);
-
         pthread_create(&id4, NULL, &BruteForceSquareMatrixMultiplication, (void *)R22Param);
+
+        pthread_join(id1, NULL);
+        pthread_join(id2, NULL);
+        pthread_join(id3, NULL);
         pthread_join(id4, NULL);
-
-
     }
     return resM;
 
