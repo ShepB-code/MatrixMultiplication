@@ -6,7 +6,7 @@
 #define MATRIXMULTIPLICATION_THREADEDMATRIXMULT_H
 
 #include <pthread.h>
-#include <thread>
+#include <vector>
 using namespace std;
 
 
@@ -23,59 +23,56 @@ struct SquareMatrix{
             }
         }
     }
+    ~SquareMatrix() {
+        for(int i = 0; i < dim; i++) {
+            delete[] data;
+        }
+    }
 };
 
 struct MatrixSection {
+    // refers to a complete matrix, and knows its bounds
     SquareMatrix* M;
-    int rowStart, rowEnd;
-    int colStart, colEnd;
-    MatrixSection(SquareMatrix* M, int rowStart, int rowEnd, int colStart, int colEnd) {
+    int rowStart, colStart, dim;
+    MatrixSection(SquareMatrix* M, int rowStart, int colStart, int dim) {
         this->M = M;
-        this->rowStart = rowStart;
-        this->rowEnd = rowEnd;
-        this->colStart = colStart;
-        this->colEnd = colEnd;
-    }
-};
-struct MatrixThreadParams {
-    const SquareMatrix* A;
-    const SquareMatrix* B;
-    SquareMatrix* R;
-    int rowEnd, colEnd, dim;
-    int rowStart, colStart;
-    MatrixThreadParams(const SquareMatrix* A, const SquareMatrix* B, SquareMatrix* R, int rowEnd, int colEnd, int rowStart, int colStart, int dim) {
-        this->A = A;
-        this->B = B;
-        this->R = R;
-        this->rowEnd = rowEnd;
-        this->colEnd = colEnd;
         this->rowStart = rowStart;
         this->colStart = colStart;
         this->dim = dim;
     }
+};
+struct MatrixThreadParams {
+    const MatrixSection* A;
+    const MatrixSection* B;
+    MatrixSection* R;
+    MatrixThreadParams(const MatrixSection* A, const MatrixSection* B, MatrixSection* R) {
+        this->A = A;
+        this->B = B;
+        this->R = R;
+    }
     //MatrixThreadParams(const SquareMatrix *a, const SquareMatrix *b, SquareMatrix *r, int rowEnd, int colEnd, int dim, int rowStart, int colStart) : A(a), B(b), R(r), rowEnd(rowEnd), colEnd(colEnd), dim(dim), rowStart(rowStart), colStart(colStart) {}
 };
 
-SquareMatrix* matrixAddition(const SquareMatrix& A, const SquareMatrix& B) {
-    SquareMatrix* C = new SquareMatrix(A.dim);
+MatrixSection* matrixAddition(const MatrixSection& A, const MatrixSection& B, MatrixSection& C) {
+    //SquareMatrix* C = new SquareMatrix(A.dim);
+    cout << A.dim << "x" << B.dim << "->" << C.dim << endl;
 
-    for(int i = 0; i < A.dim; i++) {
-        for(int j = 0; j < B.dim; j++) {
-            C->data[i][j] = A.data[i][j] + B.data[i][j];
+    for(int i = 0; i < C.dim; i++) {
+        for(int j = 0; j < C.dim; j++) {
+            C.M->data[i + C.rowStart][j + C.colStart] = A.M->data[i + A.rowStart][j + A.colStart] + B.M->data[i + B.rowStart][j + B.colStart];
         }
     }
-    return C;
+    return (MatrixSection *)&C;
 }
 
-SquareMatrix* matrixSubtraction(const SquareMatrix& A, const SquareMatrix& B) {
-    SquareMatrix* C = new SquareMatrix(A.dim);
-
-    for(int i = 0; i < A.dim; i++) {
-        for(int j = 0; j < B.dim; j++) {
-            C->data[i][j] = A.data[i][j] - B.data[i][j];
+MatrixSection* matrixSubtraction(const MatrixSection& A, const MatrixSection& B, MatrixSection& C) {
+    cout << A.dim << "x" << B.dim << "->" << C.dim << endl;
+    for(int i = 0; i < C.dim; i++) {
+        for(int j = 0; j < C.dim; j++) {
+            C.M->data[i + C.rowStart][j + C.colStart] = A.M->data[i + A.rowStart][j + A.colStart] - B.M->data[i + B.rowStart][j + B.colStart];
         }
     }
-    return C;
+    return (MatrixSection *)&C;
 }
 
 void* BruteForceSquareMatrixMultiplication(void* params) {
@@ -83,19 +80,71 @@ void* BruteForceSquareMatrixMultiplication(void* params) {
 
     //SquareMatrix* resM = new SquareMatrix{matrixPackage->A->dim, new int*[matrixPackage->A->dim]};
 
-    for(int i = matrixParams->rowStart; i < matrixParams->rowEnd; i++) {
-        for(int j = matrixParams->colStart; j < matrixParams->colEnd; j++) {
+    const MatrixSection* A = matrixParams->A;
+    const MatrixSection* B = matrixParams->B;
+    MatrixSection* R = matrixParams->R;
+
+    cout << "A (" << A->rowStart << "," << A->colStart << ") " << " B ("<< B->rowStart << "," << B->colStart << ") " << "R (" << R->rowStart << "," << R->colStart << ")" << endl;
+
+
+                                            //cout << A->M->dim << "x" << B->M->dim << "->" << R->dim << endl;
+    int mid = R->dim/2;
+    for(int i = 0; i < mid; i++) {
+        for(int j = 0; j < mid; j++) {
             //matrixParams->R->data[i][j] = 0;
             int sum = 0;
-            for(int k = 0; k < matrixParams->dim; k++) {
-                sum += matrixParams->A->data[i][k] * matrixParams->B->data[k][j];
+            for(int k = 0; k < mid; k++) {
+                sum += A->M->data[i + A->rowStart][k + A->colStart] * B->M->data[k + B->rowStart][j + B->colStart];
             }
-            matrixParams->R->data[i][j] = sum;
+            R->M->data[i + R->rowStart][j + R->colStart] = sum;
         }
     }
-    pthread_exit(NULL);
+    cout << "Done" << endl;
+    //pthread_exit(NULL);
     //return params;
 }
+
+void StrassenHelper(const MatrixSection& A, const MatrixSection& B, MatrixSection& C) {
+    // uses custom input from strassen to then call threaded divide and conquer
+    // Going to perform A * B and store it in C
+    if(A.dim == 1 && B.dim == 1) {
+        C.M->data[0][0] = A.M->data[A.rowStart][A.colStart] * B.M->data[B.rowStart][B.colStart];
+    } else {
+        int mid = A.dim/2;
+        // split matrix into 4 sections
+        MatrixThreadParams* R11Param = new MatrixThreadParams(new MatrixSection(A.M, A.rowStart, A.colStart, mid), new MatrixSection(B.M, B.rowStart, B.colStart, mid), new MatrixSection(C.M, C.rowStart, C.colStart, mid));
+        MatrixThreadParams* R12Param = new MatrixThreadParams(new MatrixSection(A.M, A.rowStart, A.colStart + mid, mid), new MatrixSection(B.M, B.rowStart, B.colStart + mid, mid), new MatrixSection(C.M, C.rowStart, C.colStart + mid, mid));
+        MatrixThreadParams* R21Param = new MatrixThreadParams(new MatrixSection(A.M,  A.rowStart + mid, A.colStart, mid), new MatrixSection(B.M, B.rowStart + mid, B.colStart, mid), new MatrixSection(C.M, C.rowStart + mid, C.colStart, mid));
+        MatrixThreadParams* R22Param = new MatrixThreadParams(new MatrixSection(A.M, A.rowStart + mid, A.colStart + mid, mid), new MatrixSection(B.M, B.rowStart + mid, B.colStart + mid, mid), new MatrixSection(C.M, C.rowStart + mid, C.colStart + mid, mid));
+
+        pthread_t id1, id2, id3, id4;
+        // spawn 4 threads
+
+
+
+        BruteForceSquareMatrixMultiplication((void*)R11Param);
+        BruteForceSquareMatrixMultiplication((void*)R12Param);
+        BruteForceSquareMatrixMultiplication((void*)R21Param);
+        BruteForceSquareMatrixMultiplication((void*)R22Param);
+
+        /*
+        pthread_create(&id1, NULL, &BruteForceSquareMatrixMultiplication, (void *)R11Param);
+        pthread_create(&id2, NULL, &BruteForceSquareMatrixMultiplication, (void *)R12Param);
+        pthread_create(&id3, NULL, &BruteForceSquareMatrixMultiplication, (void *)R21Param);
+        pthread_create(&id4, NULL, &BruteForceSquareMatrixMultiplication, (void *)R22Param);
+
+
+        // join all threads
+        pthread_join(id1, NULL);
+        pthread_join(id2, NULL);
+        pthread_join(id3, NULL);
+        pthread_join(id4, NULL);
+        */
+    }
+}
+
+
+// BOOTH FUNCTIONS (defined by me)
 SquareMatrix* BruteForce(const SquareMatrix& A, const SquareMatrix& B) {
     SquareMatrix* m = new SquareMatrix(A.dim);
     int sum;
@@ -119,23 +168,26 @@ SquareMatrix* ThreadedDivideAndConquer(const SquareMatrix& A, const SquareMatrix
     } else {
         int mid = A.dim / 2;
 
-        int dim = resM->dim;
-        MatrixThreadParams* R11Param = new MatrixThreadParams((SquareMatrix *) &A, (SquareMatrix*) &B, resM, mid, mid, 0, 0, dim);
-        MatrixThreadParams* R12Param = new MatrixThreadParams((SquareMatrix *) &A, (SquareMatrix*) &B, resM, mid + mid, mid, mid, 0, dim);
-        MatrixThreadParams* R21Param = new MatrixThreadParams((SquareMatrix *) &A, (SquareMatrix*) &B, resM, mid, mid + mid, 0, mid, dim);
-        MatrixThreadParams* R22Param = new MatrixThreadParams((SquareMatrix *) &A, (SquareMatrix*) &B, resM, mid + mid, mid + mid, mid, mid, dim);
+        MatrixThreadParams* R11Param = new MatrixThreadParams(new MatrixSection((SquareMatrix *) &A, 0, 0, mid), new MatrixSection((SquareMatrix *)&B, 0, 0, mid), new MatrixSection((SquareMatrix *) &resM, 0, 0, mid));
+        MatrixThreadParams* R12Param = new MatrixThreadParams(new MatrixSection((SquareMatrix *) &A, 0, mid, mid), new MatrixSection((SquareMatrix*) &B, 0, mid,mid), new MatrixSection((SquareMatrix *) &resM, 0, mid, mid));
+        MatrixThreadParams* R21Param = new MatrixThreadParams(new MatrixSection((SquareMatrix *) &A, mid, 0, mid), new MatrixSection((SquareMatrix*) &B, mid, 0, mid), new MatrixSection((SquareMatrix *) &resM, mid, 0, mid));
+        MatrixThreadParams* R22Param = new MatrixThreadParams(new MatrixSection((SquareMatrix *) &A, mid, mid, mid), new MatrixSection((SquareMatrix *)&B, mid, mid, mid), new MatrixSection((SquareMatrix *) &resM, mid, mid, mid));
 
         pthread_t id1, id2, id3, id4;
 
         pthread_create(&id1, NULL, &BruteForceSquareMatrixMultiplication, (void *)R11Param);
-        pthread_create(&id2, NULL, &BruteForceSquareMatrixMultiplication, (void *)R12Param);
-        pthread_create(&id3, NULL, &BruteForceSquareMatrixMultiplication, (void *)R21Param);
-        pthread_create(&id4, NULL, &BruteForceSquareMatrixMultiplication, (void *)R22Param);
-
         pthread_join(id1, NULL);
+
+        pthread_create( &id2, NULL, &BruteForceSquareMatrixMultiplication, (void *)R12Param);
         pthread_join(id2, NULL);
+
+        pthread_create(&id3, NULL, &BruteForceSquareMatrixMultiplication, (void *)R21Param);
         pthread_join(id3, NULL);
+
+        pthread_create(&id4, NULL, &BruteForceSquareMatrixMultiplication, (void *)R22Param);
         pthread_join(id4, NULL);
+
+
     }
     return resM;
 
@@ -143,53 +195,79 @@ SquareMatrix* ThreadedDivideAndConquer(const SquareMatrix& A, const SquareMatrix
 SquareMatrix* Strassen(const SquareMatrix& A, const SquareMatrix& B) {
 
     int mid = A.dim/2;
-    SquareMatrix* A11 = new SquareMatrix(mid); // A
-    SquareMatrix* A12 = new SquareMatrix(mid); // B
-    SquareMatrix* A21 = new SquareMatrix(mid); // C
-    SquareMatrix* A22 = new SquareMatrix(mid); // D
-    SquareMatrix* B11 = new SquareMatrix(mid); // E
-    SquareMatrix* B12 = new SquareMatrix(mid); // F
-    SquareMatrix* B21 = new SquareMatrix(mid); // G
-    SquareMatrix* B22 = new SquareMatrix(mid); // H
 
-    // fill matrices
-    for(int i = 0; i < mid; i++) {
-        for(int j = 0; j < mid; j++) {
-            A11->data[i][j] = A.data[i][j];
-            A12->data[i][j] = A.data[i][j + mid];
-            A21->data[i][j] = A.data[i + mid][j];
-            A22->data[i][j] = A.data[i + mid][j + mid];
+    // no new matrices being built, just sections being assigned
+    MatrixSection* A11 = new MatrixSection((SquareMatrix *)&A, 0, 0, mid);
+    MatrixSection* A12 = new MatrixSection((SquareMatrix *)&A, 0, mid, mid);
+    MatrixSection* A21 = new MatrixSection((SquareMatrix *)&A, mid, 0, mid);
+    MatrixSection* A22 = new MatrixSection((SquareMatrix *)&A, mid, mid, mid);
+    MatrixSection* B11 = new MatrixSection((SquareMatrix *)&B, 0, 0, mid);
+    MatrixSection* B12 = new MatrixSection((SquareMatrix *)&B, 0, mid, mid);
+    MatrixSection* B21 = new MatrixSection((SquareMatrix *)&B, mid, 0, mid);
+    MatrixSection* B22 = new MatrixSection((SquareMatrix *)&B, mid, mid, mid);
 
-            // fill all B sub-matrices with data
-            B11->data[i][j] = B.data[i][j];
-            B12->data[i][j] = B.data[i][j + mid];
-            B21->data[i][j] = B.data[i + mid][j];
-            B22->data[i][j] = B.data[i + mid][j + mid];
-        }
+    vector<MatrixSection *> sMatrices(7);
+
+    // only time that this function will change with input size. No way around it
+    for(int i = 0; i < sMatrices.size(); i++) {
+        sMatrices.at(i) = new MatrixSection(new SquareMatrix(mid), 0, 0, mid); // death
     }
-    SquareMatrix* s1 = ThreadedDivideAndConquer(*A11, *matrixSubtraction(*B12, *B22)); // A(F-H)
-    SquareMatrix* s2 = ThreadedDivideAndConquer(*matrixAddition(*A11, *A12), *B22); // (A+B)F
-    SquareMatrix* s3 = ThreadedDivideAndConquer(*matrixAddition(*A21, *A22), *B11); // (C+D)E
-    SquareMatrix* s4 = ThreadedDivideAndConquer(*A22, *matrixSubtraction(*B21, *B11)); // D(G-E)
-    SquareMatrix* s5 = ThreadedDivideAndConquer(*matrixAddition(*A11, *A22), *matrixAddition(*B11, *B22)); // (A+D)(E+H)
-    SquareMatrix* s6 = ThreadedDivideAndConquer(*matrixSubtraction(*A12, *A22), *matrixAddition(*B21, *B22)); // (B-D)(G+H)
-    SquareMatrix* s7 = ThreadedDivideAndConquer(*matrixSubtraction(*A11, *A21), *matrixAddition(*B11, *B12)); // (A-C)(E+F)
 
+    SquareMatrix* resM = new SquareMatrix(A.dim);
+
+    // storing results of operations
+    MatrixSection* storeRes1 = new MatrixSection(new SquareMatrix(mid), 0, 0, mid);
+    MatrixSection* storeRes2 = new MatrixSection(new SquareMatrix(mid), 0, 0, mid);
+
+    // s1
+    StrassenHelper(*A11, *matrixSubtraction(*B12, *B22, *storeRes1), *sMatrices.at(0));
+    // s2
+    StrassenHelper(*matrixAddition(*A11, *A12, *storeRes1), *B22, *sMatrices.at(1));
+    // s3
+    StrassenHelper(*matrixAddition(*A21, *A22, *storeRes1), *B11, *sMatrices.at(2));
+    // s4
+    StrassenHelper(*A22, *matrixSubtraction(*B21, *B11, *storeRes1), *sMatrices.at(3));
+    // s5
+    StrassenHelper(*matrixAddition(*A11, *A22, *storeRes1), *matrixAddition(*B11, *B22, *storeRes2), *sMatrices.at(4));
+    // s6
+    StrassenHelper(*matrixSubtraction(*A12, *A22, *storeRes1), *matrixAddition(*B21, *B22, *storeRes2), *sMatrices.at(5));
+    // s7
+    StrassenHelper(*matrixSubtraction(*A11, *A21, *storeRes1), *matrixAddition(*B11, *B12, *storeRes2), *sMatrices.at(6));
+
+    MatrixSection *I, *J, *K, *L;
+    I = new MatrixSection(resM, 0, 0, mid);
+    J = new MatrixSection(resM, 0, mid, mid);
+    K = new MatrixSection(resM, mid, 0, mid);
+    L = new MatrixSection(resM, mid, mid, mid);
+
+    cout << "BIG BODY L" << endl;
+
+
+    // I
+    matrixAddition(*sMatrices.at(4 ), *sMatrices.at(3), *storeRes1);
+    matrixSubtraction(*storeRes1, *sMatrices.at(1), *storeRes2);
+    matrixAddition(*storeRes2, *sMatrices.at(5), *I);
+    //matrixSubtraction(*sMatrices.at(3), *sMatrices.at(1), *storeRes1);
+    //matrixAddition(*sMatrices.at(5), *storeRes1, *storeRes2);
+    //matrixAddition(*sMatrices.at(4), *storeRes2, *I);
+
+    // J
+    matrixAddition(*sMatrices.at(0), *sMatrices.at(1), *J);
+
+    // K
+    matrixAddition(*sMatrices.at(2), *sMatrices.at(3), *K);
+
+    // L
+    matrixAddition(*sMatrices.at(0), *sMatrices.at(4), *storeRes1);
+    matrixSubtraction(*storeRes1, *sMatrices.at(2), *storeRes2);
+    matrixSubtraction(*storeRes2, *sMatrices.at(6), *L);
+    //MatrixSection* helpMe = matrixAddition(*sMatrices.at(4),  *matrixAddition(*sMatrices.at(5), , *I);
+    /*
     SquareMatrix* I = matrixAddition(*s5, *matrixAddition(*s6, *matrixSubtraction(*s4, *s2))); // (s5+(s6+(s4-s2)))
     SquareMatrix* J = matrixAddition(*s1, *s2); // (s1 + s2)
     SquareMatrix* K = matrixAddition(*s3, *s4); // (s3 + s4)
     SquareMatrix* L = matrixAddition(*matrixSubtraction(*matrixSubtraction(*s1, *s7), *s3), *s5); // (s1-(s7-(s3+s5)))
-
-    SquareMatrix* resM = new SquareMatrix(A.dim);
-
-    for(int i = 0; i < mid; i++) {
-        for(int j = 0; j < mid; j++) {
-            resM->data[i][j] = I->data[i][j];
-            resM->data[i][j + mid] = J->data[i][j];
-            resM->data[i + mid][j] = K->data[i][j];
-            resM->data[i + mid][j + mid] = L->data[i][j];
-        }
-    }
+    */
     return resM;
 
 }
@@ -221,7 +299,7 @@ SquareMatrix* ThreadedStrassen(const SquareMatrix& A, const SquareMatrix& B) {
         }
     }
 
-
+    /*
     SquareMatrix* s1 = ThreadedDivideAndConquer(*A11, *matrixSubtraction(*B12, *B22)); // A(F-H)
     SquareMatrix* s2 = ThreadedDivideAndConquer(*matrixAddition(*A11, *A12), *B22); // (A+B)F
     SquareMatrix* s3 = ThreadedDivideAndConquer(*matrixAddition(*A21, *A22), *B11); // (C+D)E
@@ -245,6 +323,9 @@ SquareMatrix* ThreadedStrassen(const SquareMatrix& A, const SquareMatrix& B) {
             resM->data[i + mid][j + mid] = L->data[i][j];
         }
     }
+     */
+     SquareMatrix* resM = new SquareMatrix(A.dim);
+
     return resM;
 }
 

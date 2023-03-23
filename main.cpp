@@ -5,7 +5,7 @@
 #include "ThreadedMatrixMult.h"
 using namespace std;
 
-const int DIMENSION = 2048;
+const int DIMENSION = 4;
 
 ostream& printMatrix(const SquareMatrix&, ostream&);
 SquareMatrix* readMatrix(istream&);
@@ -33,28 +33,33 @@ int main() {
     auto start_brute = chrono::high_resolution_clock::now();
     SquareMatrix* bruteForce = BruteForce(*m1, *m2);
     auto stop_brute = chrono::high_resolution_clock::now();
-    //printMatrix(*bruteForce, cout);
+    printMatrix(*bruteForce, cout);
 
     //cout << "---------D&CThreaded---------" << endl;
+
     auto start_dCThread = chrono::high_resolution_clock::now();
-    SquareMatrix* dCThread = ThreadedDivideAndConquer(*m1, *m2);
+    //SquareMatrix* dCThread = ThreadedDivideAndConquer(*m1, *m2);
     auto stop_dCThread = chrono::high_resolution_clock::now();
     //printMatrix(*dCThread, cout);
+
 
     //cout << "---------Strassen---------" << endl;
     auto start_strass = chrono::high_resolution_clock::now();
     SquareMatrix* strass = Strassen(*m1, *m2);
     auto stop_strass = chrono::high_resolution_clock::now();
-    //printMatrix(*strass, cout);
+    printMatrix(*strass, cout);
     //cout << "---------ThreadedStrassen---------" << endl;
 
+    /*
     cout << "---------COMPARING---------" << endl;
-    if(compareMatrices(*bruteForce, *dCThread) && compareMatrices(*bruteForce, *strass)) {
+    if(compareMatrices(*bruteForce, *dCThread) ) { //&& compareMatrices(*bruteForce, *strass)) {
         cout << "All matrices are the same" << endl;
     }
+     */
+
     cout << "---------" << DIMENSION << "x" << DIMENSION << " EXECUTION TIME---------" << endl;
     cout << "Brute Force: " << chrono::duration_cast<chrono::microseconds>(stop_brute- start_brute).count() << endl;
-    cout << "dCThread: " << chrono::duration_cast<chrono::microseconds>(stop_dCThread - start_dCThread).count() << endl;
+    //cout << "dCThread: " << chrono::duration_cast<chrono::microseconds>(stop_dCThread - start_dCThread).count() << endl;
     cout << "Strassen: " << chrono::duration_cast<chrono::microseconds>(stop_strass- start_strass).count() << endl;
   //  SquareMatrix* divideAndConquer = ThreadedDivideAndConquer(m1, m2);
 
@@ -92,10 +97,13 @@ SquareMatrix* readMatrix(istream& in) {
 
 SquareMatrix* makeMatrix(int dim) {
     SquareMatrix* m = new SquareMatrix(dim);
+    int count = 1;
     for(int i = 0; i < dim; i++) {
         for(int j = 0; j < dim; j++) {
-            m->data[i][j] = rand() % 100;
+            //m->data[i][j] = rand() % 100;
+            m->data[i][j] = count;
         }
+        count++;
     }
     return m;
 }
