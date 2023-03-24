@@ -29,21 +29,21 @@ int main() {
     //printMatrix(*m2, cout);
 
 
-    //cout << "---------BRUTE FORCE---------" << endl;
+    cout << "---------BRUTE FORCE---------" << endl;
     auto start_brute = chrono::high_resolution_clock::now();
     SquareMatrix* bruteForce = BruteForce(*m1, *m2);
     auto stop_brute = chrono::high_resolution_clock::now();
-    printMatrix(*bruteForce, cout);
+    //printMatrix(*bruteForce, cout);
 
-    //cout << "---------D&CThreaded---------" << endl;
+    cout << "---------D&CThreaded---------" << endl;
 
     auto start_dCThread = chrono::high_resolution_clock::now();
-    //SquareMatrix* dCThread = ThreadedDivideAndConquer(*m1, *m2);
+    SquareMatrix* dCThread = ThreadedDivideAndConquer(*m1, *m2);
     auto stop_dCThread = chrono::high_resolution_clock::now();
-    //printMatrix(*dCThread, cout);
+    printMatrix(*dCThread, cout);
 
 
-    //cout << "---------Strassen---------" << endl;
+    cout << "---------Strassen---------" << endl;
     auto start_strass = chrono::high_resolution_clock::now();
     SquareMatrix* strass = Strassen(*m1, *m2);
     auto stop_strass = chrono::high_resolution_clock::now();
@@ -59,7 +59,7 @@ int main() {
 
     cout << "---------" << DIMENSION << "x" << DIMENSION << " EXECUTION TIME---------" << endl;
     cout << "Brute Force: " << chrono::duration_cast<chrono::microseconds>(stop_brute- start_brute).count() << endl;
-    //cout << "dCThread: " << chrono::duration_cast<chrono::microseconds>(stop_dCThread - start_dCThread).count() << endl;
+    cout << "dCThread: " << chrono::duration_cast<chrono::microseconds>(stop_dCThread - start_dCThread).count() << endl;
     cout << "Strassen: " << chrono::duration_cast<chrono::microseconds>(stop_strass- start_strass).count() << endl;
   //  SquareMatrix* divideAndConquer = ThreadedDivideAndConquer(m1, m2);
 
