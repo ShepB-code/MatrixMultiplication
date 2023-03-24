@@ -90,13 +90,15 @@ void* BruteForceSquareMatrixMultiplication(void* params) {
 
 
     int mid = R->M->dim/2;
-    for(int i = 0; i < mid; i++) {
-        for(int j = 0; j < mid; j++) {
+    for(int i = 0; i < A->dim; i++) {
+        for(int j = 0; j < A->dim; j++) {
             //matrixParams->R->data[i][j] = 0;
             int sum = 0;
 
-            int kBound = matrixParams->all ? R->M->dim : min(A->M->dim, B->M->dim);
-            for(int k = 0; k < kBound; k++) {
+            //int kBound = matrixParams->all ? R->M->dim : min(A->M->dim, B->M->dim);
+            for(int k = 0; k < A->dim; k++) {
+                sum += A->M->data[i + A->rowStart][k + A->colStart] * B->M->data[k + B->rowStart][j + B->colStart];
+                /*
                 if(matrixParams->all) {
                     sum += A->M->data[i][k] * B->M->data[k][j];
                 } else {
@@ -108,6 +110,7 @@ void* BruteForceSquareMatrixMultiplication(void* params) {
                         sum += A->M->data[i][k] * B->M->data[k][j];
                     }
                 }
+                 */
             }
             R->M->data[i + R->rowStart][j + R->colStart] = sum;
         }
