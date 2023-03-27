@@ -1,80 +1,109 @@
+#include "ThreadedMatrixMult.h"
+#include <chrono>
+#include <iomanip>
 #include <iostream>
 #include <thread>
-#include <assert.h>
-#include <chrono>
-#include "ThreadedMatrixMult.h"
+#include <vector>
 using namespace std;
+using namespace chrono;
 
 const int DIMENSION = 1024;
+const int tests = 20;
 
 ostream& printMatrix(const SquareMatrix&, ostream&);
 SquareMatrix* readMatrix(istream&);
-SquareMatrix* makeMatrix(int);
-bool compareMatrices(const SquareMatrix&, const SquareMatrix&);
+void makeMatrix(SquareMatrix&);
 
 int main() {
-    //read in matrices through file
-    /*
-    cout << "FIRST MATRIX" << endl;
-    SquareMatrix* m1 = readMatrix(cin);
-    cout << "SECOND MATRIX" << endl;
-    SquareMatrix* m2 = readMatrix(cin);
-     */
-    SquareMatrix* m1 = makeMatrix(DIMENSION);
-    SquareMatrix* m2 = makeMatrix(DIMENSION);
-    //cout << "---------DATA---------" << endl;
-    //cout << "Matrix 1" << endl;
-    //printMatrix(*m1, cout);
-    //cout << "Matrix 2" << endl;
-    //printMatrix(*m2, cout);
 
+    SquareMatrix testA(DIMENSION), testB(DIMENSION);
 
-    cout << "---------BRUTE FORCE---------" << endl;
-    auto start_brute = chrono::high_resolution_clock::now();
-    SquareMatrix* bruteForce = BruteForce(*m1, *m2);
-    auto stop_brute = chrono::high_resolution_clock::now();
-    //printMatrix(*bruteForce, cout);
+    makeMatrix(testA);
+    makeMatrix(testB);
+    {
+        cout << "---------BRUTE FORCE---------" << endl;
+        vector<decltype(high_resolution_clock::now() - high_resolution_clock::now())> data;
+        for (int m = 0; m < tests; m++) {
+            auto start = high_resolution_clock::now();
 
-    cout << "---------D&CThreaded---------" << endl;
+            BruteForce(testA, testB);
 
-    auto start_dCThread = chrono::high_resolution_clock::now();
-    SquareMatrix* dCThread = ThreadedDivideAndConquer(*m1, *m2);
-    auto stop_dCThread = chrono::high_resolution_clock::now();
-    //printMatrix(*dCThread, cout);
+            auto stop = high_resolution_clock::now();
+            data.emplace_back(duration_cast<milliseconds>(stop - start));
+        }
+        double average = 0;
 
+        for (auto i: data) {
+            average += i.count();
+        }
+        average /= data.size();
 
-    cout << "---------Strassen---------" << endl;
-    auto start_strass = chrono::high_resolution_clock::now();
-    SquareMatrix* strass = Strassen(*m1, *m2);
-    auto stop_strass = chrono::high_resolution_clock::now();
-    //printMatrix(*strass, cout);
-
-    cout << "---------ThreadedStrassen---------" << endl;
-    auto start_tStrass = chrono::high_resolution_clock::now();
-    SquareMatrix* tStrass = ThreadedStrassen(*m1, *m2);
-    auto stop_tStrass = chrono::high_resolution_clock::now();
-    //printMatrix(*tStrass, cout);
-
-
-    cout << "---------COMPARING---------" << endl;
-    if(compareMatrices(*bruteForce, *dCThread) && compareMatrices(*bruteForce, *strass) &&
-            compareMatrices(*bruteForce, *tStrass) ) { //&& compareMatrices(*bruteForce, *strass)) {
-        cout << "All matrices are the same" << endl;
+        cout << setprecision(20) << average << endl;
     }
 
+    {
+        cout << "---------D&CThreaded---------" << endl;
+        vector<decltype(high_resolution_clock::now() - high_resolution_clock::now())> data;
+        for (int m = 0; m < tests; m++) {
+            auto start = high_resolution_clock::now();
 
-    cout << "---------" << DIMENSION << "x" << DIMENSION << " EXECUTION TIME---------" << endl;
-    cout << "Brute Force: " << chrono::duration_cast<chrono::microseconds>(stop_brute- start_brute).count() << endl;
-    cout << "dCThread: " << chrono::duration_cast<chrono::microseconds>(stop_dCThread - start_dCThread).count() << endl;
-    cout << "Strassen: " << chrono::duration_cast<chrono::microseconds>(stop_strass- start_strass).count() << endl;
-    cout << "Threaded Strassen: " << chrono::duration_cast<chrono::microseconds>(stop_tStrass- start_tStrass).count() << endl;
+            ThreadedDivideAndConquer(testA, testB);
 
-    //  SquareMatrix* divideAndConquer = ThreadedDivideAndConquer(m1, m2);
+            auto stop = high_resolution_clock::now();
+            data.emplace_back(duration_cast<milliseconds>(stop - start));
+        }
+        double average = 0;
 
+        for (auto i: data) {
+            average += i.count();
+        }
+        average /= data.size();
 
+        cout << setprecision(20) << average << endl;
+    }
 
+    {
+        cout << "---------Strassen---------" << endl;
+        vector<decltype(high_resolution_clock::now() - high_resolution_clock::now())> data;
+        for (int m = 0; m < tests; m++) {
+            auto start = high_resolution_clock::now();
 
-    // perform brute force
+            Strassen(testA, testB);
+
+            auto stop = high_resolution_clock::now();
+            data.emplace_back(duration_cast<milliseconds>(stop - start));
+        }
+        double average = 0;
+
+        for (auto i: data) {
+            average += i.count();
+        }
+        average /= data.size();
+
+        cout << setprecision(20) << average << endl;
+    }
+
+    {
+        cout << "---------ThreadedStrassen---------" << endl;
+
+        vector<decltype(high_resolution_clock::now() - high_resolution_clock::now())> data;
+        for (int m = 0; m < tests; m++) {
+            auto start = high_resolution_clock::now();
+
+            ThreadedStrassen(testA, testB);
+
+            auto stop = high_resolution_clock::now();
+            data.emplace_back(duration_cast<milliseconds>(stop - start));
+        }
+        double average = 0;
+
+        for (auto i: data) {
+            average += i.count();
+        }
+        average /= data.size();
+
+        cout << setprecision(20) << average << endl;
+    }
 
     return 0;
 }
@@ -103,27 +132,12 @@ SquareMatrix* readMatrix(istream& in) {
     return m;
 }
 
-SquareMatrix* makeMatrix(int dim) {
-    SquareMatrix* m = new SquareMatrix(dim);
-    int count = 1;
-    for(int i = 0; i < dim; i++) {
-        for(int j = 0; j < dim; j++) {
-            //m->data[i][j] = rand() % 100;
-            m->data[i][j] = count;
+void makeMatrix(SquareMatrix& m) {
+    for (int i = 0; i < m.dim; i++) {
+        for (int j = 0; j < m.dim; j++) {
+            m.data[i][j] = rand() % 100;
         }
-        count++;
     }
-    return m;
 }
 
-bool compareMatrices(const SquareMatrix& A, const SquareMatrix& B) {
-    bool same = true;
-    for(int i = 0; i < A.dim && same; i++) {
-        for(int j = 0; j < A.dim && same; j++) {
-            same = A.data[i][j] == B.data[i][j];
-        }
-    }
-    assert(same);
-    return same;
-}
 
